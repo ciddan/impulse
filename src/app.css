@@ -1,0 +1,440 @@
+/* Design tokens and shared primitives. Component-specific rules live in the
+   components themselves. */
+
+:root {
+	color-scheme: light dark;
+	/* WinUI accent-fill mapping: light theme uses AccentDark1 */
+	--accent: var(--sys-accent-dark, #2f6fed);
+	/* Light on Mica: cards are barely-there overlays, Win11 Settings style */
+	--bg: #f2f3f7;
+	--text: #1c1f27;
+	--card: rgba(255, 255, 255, 0.5);
+	--border: rgba(28, 31, 39, 0.07);
+	--dim: #5d6373;
+	--faint: #868c9a;
+	--surface: rgba(255, 255, 255, 0.55);
+	--surface-hover: rgba(28, 31, 39, 0.05);
+	--elev: rgba(255, 255, 255, 0.45);
+	--muted-border: rgba(28, 31, 39, 0.14);
+	--toggle-border: rgba(28, 31, 39, 0.45);
+	--knob-off: #5d6373;
+	--knob: #ffffff;
+	--track: rgba(28, 31, 39, 0.25);
+	--thumb-ring: #ffffff;
+	--btn-bg: rgba(255, 255, 255, 0.6);
+	--btn-border: rgba(28, 31, 39, 0.14);
+	--link: var(--sys-accent-dark, #2456c4);
+	--profile: var(--sys-accent-dark, #2456c4);
+	--chip-bg: rgba(28, 31, 39, 0.07);
+	--chip-text: #4d5364;
+	--ok-bg: #d8f1e1;
+	--ok-text: #157347;
+	--bad-bg: #f8dfe2;
+	--bad-text: #b23a4b;
+	--warn-bg: rgba(253, 245, 218, 0.8);
+	--warn-border: #d9c26a;
+	--err-bg: rgba(250, 227, 229, 0.85);
+	--err-border: #d98a92;
+	--upd-bg: rgba(229, 237, 253, 0.85);
+	--danger-border: rgba(178, 58, 75, 0.35);
+	--danger-text: #b23a4b;
+	--curve-grid: rgba(28, 31, 39, 0.08);
+	--curve-zero: rgba(28, 31, 39, 0.25);
+	--curve-tick: #868c9a;
+	--curve-raw: #6d7382;
+	--curve-target: #58a6e8;
+	--curve-shelf: #c97a26;
+	--curve-total: #159a5c;
+	--curve-corr: #2f6fed;
+	--flyout-bg: #f9f9f9;
+	--flyout-border: rgba(0, 0, 0, 0.09);
+	--flyout-hover: rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		/* WinUI accent-fill mapping: dark theme uses AccentLight2 */
+		--accent: var(--sys-accent-light, #4c8dff);
+		--bg: #0d0f13;
+		--text: #e6e8ee;
+		--card: rgba(255, 255, 255, 0.045);
+		--border: rgba(255, 255, 255, 0.065);
+		--dim: #9aa0af;
+		--faint: #7d8390;
+		--surface: rgba(255, 255, 255, 0.04);
+		--surface-hover: rgba(255, 255, 255, 0.07);
+		--elev: rgba(255, 255, 255, 0.035);
+		--muted-border: rgba(255, 255, 255, 0.12);
+		--toggle-border: rgba(230, 232, 238, 0.45);
+		--knob-off: #9aa0af;
+		--knob: #ffffff;
+		--track: rgba(230, 232, 238, 0.25);
+		--thumb-ring: #454b57;
+		--btn-bg: rgba(255, 255, 255, 0.06);
+		--btn-border: rgba(255, 255, 255, 0.09);
+		--link: var(--sys-accent-light, #6ea2ff);
+		--profile: var(--sys-accent-light, #9fc1ff);
+		--chip-bg: rgba(255, 255, 255, 0.08);
+		--chip-text: #aab0c0;
+		--ok-bg: rgba(18, 48, 28, 0.85);
+		--ok-text: #6fd08c;
+		--bad-bg: rgba(51, 26, 29, 0.85);
+		--bad-text: #e08a91;
+		--warn-bg: rgba(36, 31, 17, 0.75);
+		--warn-border: #5d4d1a;
+		--err-bg: rgba(36, 18, 20, 0.75);
+		--err-border: #63272c;
+		--upd-bg: rgba(18, 32, 54, 0.75);
+		--danger-border: rgba(224, 138, 145, 0.3);
+		--danger-text: #e08a91;
+		--curve-grid: rgba(230, 232, 238, 0.06);
+		--curve-zero: rgba(230, 232, 238, 0.22);
+		--curve-tick: #7d8390;
+		--curve-raw: #8b90a0;
+		--curve-target: #58a6e8;
+		--curve-shelf: #f0a35e;
+		--curve-total: #7ee0a3;
+		--curve-corr: #6ea2ff;
+		--flyout-bg: #2c2c2c;
+		--flyout-border: rgba(255, 255, 255, 0.08);
+		--flyout-hover: rgba(255, 255, 255, 0.065);
+	}
+}
+
+/* Solid fallback (no Mica): opaque palette. */
+body.solid {
+	background: var(--bg);
+	--card: #ffffff;
+	--border: #dfe2ea;
+	--surface: #f5f6fa;
+	--surface-hover: #ecedf3;
+	--elev: #f7f8fb;
+	--btn-bg: #ffffff;
+	--warn-bg: #fdf5da;
+	--err-bg: #fae3e5;
+	--upd-bg: #e5edfd;
+}
+
+@media (prefers-color-scheme: dark) {
+	body.solid {
+		--card: #14171e;
+		--border: #222735;
+		--surface: #0f1218;
+		--surface-hover: #1a1e28;
+		--elev: #171a22;
+		--btn-bg: #1a1e28;
+		--warn-bg: #241f11;
+		--err-bg: #241214;
+		--upd-bg: #122036;
+	}
+}
+
+body {
+	margin: 0;
+	/* Transparent so the Mica backdrop shows through. */
+	background: transparent;
+	color: var(--text);
+	font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+	font-size: 14px;
+	user-select: none;
+}
+
+input,
+textarea {
+	user-select: text;
+}
+
+/* Layout ------------------------------------------------------------- */
+
+main {
+	max-width: 680px;
+	margin: 0 auto;
+	padding: 22px 24px 30px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.card {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 16px 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.divider {
+	height: 1px;
+	background: var(--border);
+	margin: 6px -18px;
+}
+
+/* Typography --------------------------------------------------------- */
+
+h2 {
+	font-size: 14px;
+	font-weight: 400;
+	color: var(--text);
+	margin: 0;
+}
+
+.row-title {
+	font-size: 14px;
+	color: var(--text);
+}
+
+.for-device {
+	text-transform: none;
+	letter-spacing: normal;
+	color: var(--faint);
+	font-weight: 400;
+}
+
+.dim {
+	color: var(--dim);
+	font-size: 12px;
+}
+
+.hint {
+	color: var(--dim);
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.profile-name {
+	font-weight: 600;
+	color: var(--profile);
+	font-size: 13px;
+}
+
+.loading {
+	color: var(--dim);
+	text-align: center;
+	padding: 48px 0;
+}
+
+/* Chips -------------------------------------------------------------- */
+
+.chip {
+	font-size: 11px;
+	border-radius: 999px;
+	padding: 1px 8px;
+	background: var(--chip-bg);
+	color: var(--chip-text);
+}
+
+.chip.ok {
+	background: var(--ok-bg);
+	color: var(--ok-text);
+}
+
+.chip.bad {
+	background: var(--bad-bg);
+	color: var(--bad-text);
+}
+
+/* Buttons ------------------------------------------------------------ */
+
+.apply {
+	background: var(--accent);
+	color: white;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	border-bottom-color: rgba(0, 0, 0, 0.3);
+	border-radius: 4px;
+	padding: 5px 16px;
+	cursor: pointer;
+	flex-shrink: 0;
+	font-family: inherit;
+}
+
+.apply:hover {
+	filter: brightness(1.08);
+}
+
+.apply:disabled {
+	opacity: 0.5;
+	cursor: default;
+	filter: none;
+}
+
+.apply.small {
+	padding: 2px 12px;
+	font-size: 12px;
+}
+
+.secondary {
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-border);
+	color: var(--text);
+	border-radius: 4px;
+	padding: 5px 14px;
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 13px;
+}
+
+.secondary:hover {
+	background: var(--surface-hover);
+}
+
+.secondary:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.remove {
+	background: var(--btn-bg);
+	border: 1px solid var(--btn-border);
+	color: var(--danger-text);
+	border-radius: 4px;
+	padding: 5px 12px;
+	cursor: pointer;
+	flex-shrink: 0;
+	font-family: inherit;
+}
+
+.remove:hover {
+	background: var(--surface-hover);
+}
+
+.link {
+	background: none;
+	border: none;
+	color: var(--link);
+	cursor: pointer;
+	padding: 0;
+	font-size: inherit;
+	font-family: inherit;
+}
+
+.link:disabled {
+	opacity: 0.5;
+}
+
+/* Search input ------------------------------------------------------- */
+
+input[type="search"] {
+	width: 100%;
+	box-sizing: border-box;
+	background: var(--surface);
+	border: 1px solid var(--muted-border);
+	border-bottom-color: var(--toggle-border);
+	border-radius: 4px;
+	color: inherit;
+	font-size: 15px;
+	padding: 10px 14px;
+	outline: none;
+	font-family: inherit;
+}
+
+input[type="search"]:focus {
+	border-bottom: 2px solid var(--accent);
+	padding-bottom: 9px;
+}
+
+/* Switch rows -------------------------------------------------------- */
+
+.switch-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 13px;
+	color: var(--text);
+}
+
+.switch-spacer {
+	flex: 1;
+}
+
+/* Sliders ------------------------------------------------------------ */
+
+.sliders {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* Banners ------------------------------------------------------------ */
+
+.banner {
+	border-radius: 8px;
+	padding: 12px 14px;
+	line-height: 1.45;
+}
+
+.banner.warn {
+	background: var(--warn-bg);
+	border: 1px solid var(--warn-border);
+}
+
+.banner.error {
+	background: var(--err-bg);
+	border: 1px solid var(--err-border);
+}
+
+.banner.update {
+	background: var(--upd-bg);
+	border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.banner.update button {
+	margin-left: auto;
+}
+
+.banner p {
+	margin: 6px 0 10px;
+	color: var(--text);
+	opacity: 0.85;
+}
+
+.banner button {
+	background: var(--accent);
+	color: white;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	border-bottom-color: rgba(0, 0, 0, 0.3);
+	border-radius: 4px;
+	padding: 6px 14px;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.banner button:hover {
+	filter: brightness(1.08);
+}
+
+/* Footer ------------------------------------------------------------- */
+
+footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 2px 0;
+	color: var(--dim);
+	font-size: 13px;
+}
+
+.autostart {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+}
+
+.autostart input {
+	accent-color: var(--accent);
+}
+
+.footer-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.dot {
+	color: var(--faint);
+}
