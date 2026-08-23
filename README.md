@@ -31,14 +31,19 @@ for a week.
 
 ## Features
 
-- Fuzzy search across the full AutoEq database, best measurement source ranked first
+- Search across the full AutoEq database (~6,000 profiles), best measurement source
+  ranked first, alternative sources one click away
 - Per-device profiles — assignments follow the endpoint GUID and survive unplug/replug
 - Response chart with raw / target / corrected curves — the correction is **measured from the
   actual convolver IR on disk**, not the published curve; smoothed and per-series toggles
 - Bass shelf (post-convolver) with automatic pre-gain compensation so boosts can never clip
+- Native Windows 11 look: Mica backdrop (solid fallback pre-Win11 or with transparency
+  effects disabled), Fluent controls, system accent color, light/dark theme
 - Master EQ on/off from the window or the system tray; close-to-tray; start-with-Windows
 - Self-healing: a wiped Equalizer APO config is restored automatically on launch
 - Auto-updates from GitHub Releases (signed, via the Tauri updater)
+
+The app is Windows-only by design.
 
 ## Development
 
@@ -70,7 +75,8 @@ Stack: Tauri v2 (Rust) + SvelteKit (Svelte 5, static adapter, SPA mode) + TypeSc
 
 1. Add the repo secret `TAURI_SIGNING_PRIVATE_KEY` (contents of the private key generated with
    `pnpm tauri signer generate`; the public key lives in `tauri.conf.json`).
-2. Bump `version` in `src-tauri/tauri.conf.json`, commit, and push a `v*` tag.
+2. Bump the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and
+   `package.json` (keep them aligned), commit, and push a `v*` tag.
 3. The workflow builds the NSIS installer, signs the updater artifact, and publishes a GitHub
    Release with `latest.json`. Running apps pick the update up on next launch.
 

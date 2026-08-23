@@ -1,6 +1,6 @@
 [package]
 name = "impulse"
-version = "0.1.0"
+version = "1.0.0"
 description = "Impulse — Wavelet-style AutoEq frontend for Windows system audio"
 authors = ["ciddan"]
 edition = "2021"
