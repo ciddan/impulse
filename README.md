@@ -3,6 +3,8 @@
 AutoEq for your Windows system audio — a Wavelet-style frontend. Pick your headphones, hit
 Apply. No config editing.
 
+![Impulse](docs/screenshot.png)
+
 ## How it works
 
 Impulse requires [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) and drives it
