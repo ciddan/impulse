@@ -430,7 +430,7 @@
         <div class="hint">No matches. Try fewer words.</div>
       {/if}
       {#if !query}
-        <div>
+        <div class="custom-ir-row">
           <button
             class="secondary"
             disabled={busy || !selectedDevice || !status.eapo.installed}
@@ -438,6 +438,11 @@
           >
             Load custom impulse response…
           </button>
+          {#if selectedDevice?.assignment?.source === "custom"}
+            <span class="dim">
+              Loaded: <span class="profile-name">{selectedDevice.assignment.name}.wav</span>
+            </span>
+          {/if}
         </div>
       {/if}
       {#if results.length}
@@ -485,7 +490,11 @@
         <div class="response-head">
           <h2>
             Response
-            <span class="for-device">{selectedDevice.assignment.name} on {selectedDevice.name}</span>
+            <span class="for-device">
+              {selectedDevice.assignment.name}{selectedDevice.assignment.source === "custom"
+                ? " (custom IR)"
+                : ""} on {selectedDevice.name}
+            </span>
           </h2>
           <button class="remove" disabled={busy} onclick={() => onClear(selectedDevice.guid)}>
             Remove profile
@@ -1302,6 +1311,11 @@
   }
   .assigned li.offline {
     opacity: 0.65;
+  }
+  .custom-ir-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   .secondary {
     background: var(--btn-bg);
