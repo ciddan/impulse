@@ -120,16 +120,22 @@ fn regenerate(app: &AppHandle) -> Result<(), String> {
         if preamp < 0.0 {
             lines.push(format!("Preamp: {:.1} dB", preamp));
         }
-        let use_ir = profile.has_ir
-            && ir_file.is_some()
-            && profile_dir.join(ir_file.unwrap()).is_file();
+        let use_ir =
+            profile.has_ir && ir_file.is_some() && profile_dir.join(ir_file.unwrap()).is_file();
         if use_ir {
-            lines.push(format!("Convolution: profiles\\{}\\{}", key, ir_file.unwrap()));
+            lines.push(format!(
+                "Convolution: profiles\\{}\\{}",
+                key,
+                ir_file.unwrap()
+            ));
         } else {
             // Sample-rate independent fallback (also used while device is offline).
             match fs::read_to_string(profile_dir.join("graphic.txt")) {
                 Ok(content) => {
-                    if let Some(line) = content.lines().find(|l| l.trim_start().starts_with("GraphicEQ:")) {
+                    if let Some(line) = content
+                        .lines()
+                        .find(|l| l.trim_start().starts_with("GraphicEQ:"))
+                    {
                         lines.push(line.trim().to_string());
                     }
                 }
@@ -222,7 +228,10 @@ fn build_status(app: &AppHandle) -> Result<AppStatus, String> {
         headroom_db: st.headroom_db,
         compensate_shelf: st.compensate_shelf,
         autostart,
-        mica: app.try_state::<BackdropState>().map(|s| s.0).unwrap_or(false),
+        mica: app
+            .try_state::<BackdropState>()
+            .map(|s| s.0)
+            .unwrap_or(false),
         accent,
         accent_light,
         accent_dark,
@@ -579,8 +588,7 @@ async fn get_curve(app: AppHandle, device_guid: String) -> CmdResult<CurveData> 
         }
     }
     if data.eq.is_empty() {
-        let content =
-            fs::read_to_string(profile_dir.join("graphic.txt")).map_err(err_str)?;
+        let content = fs::read_to_string(profile_dir.join("graphic.txt")).map_err(err_str)?;
         data.eq = parse_graphic_eq(&content);
         data.eq_source = "graphiceq".into();
     }
@@ -591,7 +599,12 @@ async fn get_curve(app: AppHandle, device_guid: String) -> CmdResult<CurveData> 
 }
 
 #[tauri::command]
-fn set_bass_shelf(app: AppHandle, device_guid: String, gain_db: f32, fc: f32) -> CmdResult<AppStatus> {
+fn set_bass_shelf(
+    app: AppHandle,
+    device_guid: String,
+    gain_db: f32,
+    fc: f32,
+) -> CmdResult<AppStatus> {
     {
         let shared = app.state::<Shared>();
         let mut st = shared.state.lock().unwrap();
@@ -794,8 +807,14 @@ pub fn run() {
 
             // Tray
             let open_item = MenuItem::with_id(app, "open", "Open Impulse", true, None::<&str>)?;
-            let toggle_item =
-                CheckMenuItem::with_id(app, "toggle", "EQ enabled", true, master_enabled, None::<&str>)?;
+            let toggle_item = CheckMenuItem::with_id(
+                app,
+                "toggle",
+                "EQ enabled",
+                true,
+                master_enabled,
+                None::<&str>,
+            )?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let menu = Menu::with_items(app, &[&open_item, &toggle_item, &separator, &quit_item])?;
@@ -814,7 +833,9 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
-            app.manage(TrayHandles { toggle: toggle_item });
+            app.manage(TrayHandles {
+                toggle: toggle_item,
+            });
 
             // Start hidden when launched with --minimized (autostart).
             if std::env::args().any(|a| a == "--minimized") {

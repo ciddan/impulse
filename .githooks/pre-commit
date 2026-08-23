@@ -1,0 +1,14 @@
+#!/bin/sh
+# Impulse pre-commit: lint + formatting gates.
+set -e
+
+PATH="$HOME/.cargo/bin:$PATH"
+
+echo "pre-commit: oxlint"
+pnpm exec oxlint src
+
+echo "pre-commit: oxfmt --check"
+pnpm exec oxfmt --check src
+
+echo "pre-commit: cargo fmt --check"
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check

@@ -271,7 +271,11 @@ pub async fn download_curves_csv(source: &str, form: &str, name: &str) -> Result
         encode_path_segment(&format!("{}/{}/{}", source, form, name)),
         encode_path_segment(&format!("{}.csv", name))
     );
-    let resp = client.get(&url).send().await.context("download curves csv")?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .context("download curves csv")?;
     if !resp.status().is_success() {
         bail!("curves csv download failed: {}", resp.status());
     }
@@ -297,8 +301,16 @@ pub async fn download_profile(source: &str, form: &str, name: &str) -> Result<Pr
         encode_path_segment(&format!("{}/{}/{}", source, form, name))
     );
 
-    let geq_url = format!("{}/{}", base, encode_path_segment(&format!("{} GraphicEQ.txt", name)));
-    let resp = client.get(&geq_url).send().await.context("download GraphicEQ")?;
+    let geq_url = format!(
+        "{}/{}",
+        base,
+        encode_path_segment(&format!("{} GraphicEQ.txt", name))
+    );
+    let resp = client
+        .get(&geq_url)
+        .send()
+        .await
+        .context("download GraphicEQ")?;
     if !resp.status().is_success() {
         bail!("GraphicEQ download failed: {} ({})", resp.status(), geq_url);
     }
@@ -312,7 +324,10 @@ pub async fn download_profile(source: &str, form: &str, name: &str) -> Result<Pr
     }
 
     let mut irs = Vec::new();
-    for (rate, file_name) in [(44100u32, "minphase_44100.wav"), (48000, "minphase_48000.wav")] {
+    for (rate, file_name) in [
+        (44100u32, "minphase_44100.wav"),
+        (48000, "minphase_48000.wav"),
+    ] {
         let url = format!(
             "{}/{}",
             base,
@@ -327,5 +342,9 @@ pub async fn download_profile(source: &str, form: &str, name: &str) -> Result<Pr
         }
     }
 
-    Ok(ProfileFiles { graphic_eq, irs, extras })
+    Ok(ProfileFiles {
+        graphic_eq,
+        irs,
+        extras,
+    })
 }

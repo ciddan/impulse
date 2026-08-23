@@ -43,17 +43,21 @@ pub fn detect() -> EapoStatus {
     };
 
     let install_dir: Option<String> = key.get_value::<String, _>("InstallPath").ok();
-    let config_dir: Option<String> = key
-        .get_value::<String, _>("ConfigPath")
-        .ok()
-        .or_else(|| install_dir.as_ref().map(|p| format!("{}\\config", p.trim_end_matches('\\'))));
+    let config_dir: Option<String> = key.get_value::<String, _>("ConfigPath").ok().or_else(|| {
+        install_dir
+            .as_ref()
+            .map(|p| format!("{}\\config", p.trim_end_matches('\\')))
+    });
 
     let config_dir = config_dir.filter(|p| Path::new(p).is_dir());
     let include_installed = config_dir
         .as_deref()
         .map(|dir| {
             fs::read_to_string(Path::new(dir).join("config.txt"))
-                .map(|c| c.lines().any(|l| l.trim().eq_ignore_ascii_case(INCLUDE_LINE)))
+                .map(|c| {
+                    c.lines()
+                        .any(|l| l.trim().eq_ignore_ascii_case(INCLUDE_LINE))
+                })
                 .unwrap_or(false)
         })
         .unwrap_or(false);
@@ -71,9 +75,7 @@ pub fn detect() -> EapoStatus {
 fn eapo_apo_clsids() -> Vec<String> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let mut ids = Vec::new();
-    if let Ok(key) =
-        hklm.open_subkey("SOFTWARE\\Classes\\AudioEngine\\AudioProcessingObjects")
-    {
+    if let Ok(key) = hklm.open_subkey("SOFTWARE\\Classes\\AudioEngine\\AudioProcessingObjects") {
         for name in key.enum_keys().flatten() {
             if let Ok(sub) = key.open_subkey(&name) {
                 let friendly: String = sub.get_value("FriendlyName").unwrap_or_default();
@@ -187,7 +189,11 @@ pub struct DeviceSection {
 
 /// Regenerate the managed file. With `enabled == false` an empty (comment-only)
 /// file is written, which EAPO hot-reloads to bypass all our filters.
-pub fn write_managed_config(config_dir: &str, enabled: bool, sections: &[DeviceSection]) -> Result<()> {
+pub fn write_managed_config(
+    config_dir: &str,
+    enabled: bool,
+    sections: &[DeviceSection],
+) -> Result<()> {
     let dir = managed_dir(config_dir);
     fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
 

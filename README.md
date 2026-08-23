@@ -53,10 +53,15 @@ mechanism.
 
 ```sh
 pnpm install
+git config core.hooksPath .githooks   # one-time: enable the pre-commit hook
 pnpm tauri dev    # run the app with hot reload
 pnpm tauri build  # produce the NSIS installer + updater artifacts
 pnpm run check    # svelte-check / TypeScript
+pnpm run lint     # oxlint
+pnpm run format   # oxfmt (tabs, double quotes; .svelte files not covered)
 ```
+
+The pre-commit hook runs oxlint, `oxfmt --check`, and `cargo fmt --check`.
 
 Stack: Tauri v2 (Rust) + SvelteKit (Svelte 5, static adapter, SPA mode) + TypeScript.
 
