@@ -1,0 +1,12 @@
+﻿<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="spike" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#2f6fed"/>
+      <stop offset="1" stop-color="#7ee0a3"/>
+    </linearGradient>
+  </defs>
+  <path d="M76 300 H190 L230 122 L270 404 L300 246 L328 318 H436"
+        fill="none" stroke="url(#spike)" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="76"  cy="300" r="38" fill="#e6e8ee"/>
+  <circle cx="436" cy="318" r="38" fill="#e6e8ee"/>
+</svg>
