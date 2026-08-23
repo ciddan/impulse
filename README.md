@@ -1,8 +1,8 @@
 # Impulse
 
 AutoEq for your Windows system audio — a Wavelet-style frontend. Pick your headphones, hit
-Apply, and the correction is live on your output device about a second later: convolution EQ
-when possible, graphic EQ otherwise. No reboots, no config editing.
+Apply, and the correction is live on your output device about a second later. No reboots, no
+config editing.
 
 ## How it works
 
