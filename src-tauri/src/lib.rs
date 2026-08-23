@@ -299,6 +299,99 @@ async fn apply_profile(
     build_status(&app)
 }
 
+/// Marker source for user-supplied impulse responses.
+const CUSTOM_SOURCE: &str = "custom";
+
+/// Pick a WAV impulse response and assign it to a device. Returns None when
+/// the user cancels the picker.
+#[tauri::command]
+async fn apply_custom_ir(
+    app: AppHandle,
+    device_guid: String,
+    device_name: String,
+) -> CmdResult<Option<AppStatus>> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let eapo_status = eapo::detect();
+    let config_dir = eapo_status
+        .config_dir
+        .ok_or("Equalizer APO is not installed")?;
+    let device_rate = devices::list_render_devices()
+        .map_err(err_str)?
+        .into_iter()
+        .find(|d| d.guid.eq_ignore_ascii_case(&device_guid))
+        .map(|d| d.sample_rate)
+        .ok_or("Output device not found")?;
+
+    let dialog = app
+        .dialog()
+        .file()
+        .add_filter("Impulse response", &["wav"])
+        .set_title("Choose a convolver impulse response");
+    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file())
+        .await
+        .map_err(err_str)?;
+    let Some(file) = picked else {
+        return Ok(None);
+    };
+    let path = file.into_path().map_err(err_str)?;
+
+    let ir_rate = hound::WavReader::open(&path)
+        .map_err(|e| format!("Could not read WAV: {}", e))?
+        .spec()
+        .sample_rate;
+    if ir_rate != 44100 && ir_rate != 48000 {
+        return Err(format!(
+            "This IR is {} Hz — Equalizer APO's convolver needs 44100 or 48000 Hz",
+            ir_rate
+        ));
+    }
+    if ir_rate != device_rate {
+        return Err(format!(
+            "This IR is {} Hz but \"{}\" mixes at {} Hz. Set the device to {} Hz in Windows \
+             sound settings, or use an IR at the device's rate.",
+            ir_rate, device_name, device_rate, ir_rate
+        ));
+    }
+
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("impulse")
+        .to_string();
+    let bytes = fs::read(&path).map_err(err_str)?;
+    let key = eapo::sanitize_key(CUSTOM_SOURCE, &stem);
+    let ir_name = format!("minphase_{}.wav", ir_rate);
+    eapo::install_profile_files(&config_dir, &key, &[(ir_name, bytes)]).map_err(err_str)?;
+    eapo::ensure_include(&config_dir).map_err(err_str)?;
+
+    {
+        let shared = app.state::<Shared>();
+        let mut st = shared.state.lock().unwrap();
+        let (bass_gain_db, bass_fc) = st
+            .assignments
+            .get(&device_guid)
+            .map(|p| (p.bass_gain_db, p.bass_fc))
+            .unwrap_or((0.0, 350.0));
+        st.assignments.insert(
+            device_guid.clone(),
+            AssignedProfile {
+                source: CUSTOM_SOURCE.into(),
+                form: CUSTOM_SOURCE.into(),
+                name: stem,
+                has_ir: true,
+                bass_gain_db,
+                bass_fc,
+            },
+        );
+        st.device_names.insert(device_guid, device_name);
+        state::save(&app_data_dir(&app)?, &st).map_err(err_str)?;
+    }
+
+    regenerate(&app)?;
+    build_status(&app).map(Some)
+}
+
 #[tauri::command]
 fn clear_profile(app: AppHandle, device_guid: String) -> CmdResult<AppStatus> {
     {
@@ -490,7 +583,7 @@ async fn get_curve(app: AppHandle, device_guid: String) -> CmdResult<CurveData> 
     let profile_dir = eapo::profiles_dir(&config_dir).join(&key);
 
     let csv_path = profile_dir.join("curves.csv");
-    if !csv_path.is_file() {
+    if !csv_path.is_file() && source != CUSTOM_SOURCE {
         // Profile predates CSV support (or download failed at apply time).
         if let Ok(bytes) = autoeq::download_curves_csv(&source, &form, &name).await {
             let _ = fs::write(&csv_path, bytes);
@@ -704,6 +797,14 @@ async fn self_heal(app: AppHandle) {
         if dir.join("minphase_44100.wav").is_file() || dir.join("minphase_48000.wav").is_file() {
             continue;
         }
+        if profile.source == CUSTOM_SOURCE {
+            // User-supplied IRs cannot be re-downloaded.
+            eprintln!(
+                "self-heal: custom IR files for '{}' are missing and cannot be restored",
+                profile.name
+            );
+            continue;
+        }
         match autoeq::download_profile(&profile.source, &profile.form, &profile.name).await {
             Ok(files) => {
                 let mut to_write: Vec<(String, Vec<u8>)> = files.irs;
@@ -749,6 +850,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
@@ -824,6 +926,7 @@ pub fn run() {
             get_status,
             get_index,
             apply_profile,
+            apply_custom_ir,
             clear_profile,
             set_master,
             set_headroom,

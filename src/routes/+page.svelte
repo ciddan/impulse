@@ -10,6 +10,7 @@
     getIndex,
     getCurve,
     applyProfile,
+    applyCustomIr,
     clearProfile,
     setMaster,
     setBassShelf,
@@ -133,6 +134,20 @@
       status = await applyProfile(selectedDevice.guid, selectedDevice.name, entry);
       query = "";
       expandedResult = null;
+    } catch (e) {
+      actionError = String(e);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function onCustomIr() {
+    if (!selectedDevice) return;
+    busy = true;
+    actionError = null;
+    try {
+      const s = await applyCustomIr(selectedDevice.guid, selectedDevice.name);
+      if (s) status = s;
     } catch (e) {
       actionError = String(e);
     } finally {
@@ -413,6 +428,17 @@
       />
       {#if query && results.length === 0 && !indexLoading}
         <div class="hint">No matches. Try fewer words.</div>
+      {/if}
+      {#if !query}
+        <div>
+          <button
+            class="secondary"
+            disabled={busy || !selectedDevice || !status.eapo.installed}
+            onclick={onCustomIr}
+          >
+            Load custom impulse response…
+          </button>
+        </div>
       {/if}
       {#if results.length}
         <ul class="results">
@@ -1276,6 +1302,23 @@
   }
   .assigned li.offline {
     opacity: 0.65;
+  }
+  .secondary {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 5px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .secondary:hover {
+    background: var(--surface-hover);
+  }
+  .secondary:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
   .remove {
     background: var(--btn-bg);

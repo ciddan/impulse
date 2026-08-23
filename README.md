@@ -36,6 +36,8 @@ for a week.
 - Response chart with raw / target / corrected curves — the correction is **measured from the
   actual convolver IR on disk**, not the published curve; smoothed and per-series toggles
 - Bass shelf (post-convolver) with automatic pre-gain compensation so boosts can never clip
+- Custom convolver WAVs — bring your own impulse response (44.1/48 kHz, matched to the
+  device's mix rate); it gets the same measured-response chart, bass shelf, and gain handling
 - Native Windows 11 look: Mica backdrop (solid fallback pre-Win11 or with transparency
   effects disabled), Fluent controls, system accent color, light/dark theme
 - Master EQ on/off from the window or the system tray; close-to-tray; start-with-Windows
@@ -86,7 +88,6 @@ Stack: Tauri v2 (Rust) + SvelteKit (Svelte 5, static adapter, SPA mode) + TypeSc
 
 ## Roadmap
 
-- Custom convolver WAVs (bring your own impulse response)
 - Standalone convolution engine (virtual audio device + WASAPI) to drop the Equalizer APO
   dependency entirely
 - Correction strength slider (requires generating minimum-phase FIRs locally)

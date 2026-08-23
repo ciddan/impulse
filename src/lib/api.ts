@@ -70,6 +70,8 @@ export const applyProfile = (deviceGuid: string, deviceName: string, entry: Head
 		name: entry.name,
 		hasIr: entry.has_ir,
 	});
+export const applyCustomIr = (deviceGuid: string, deviceName: string) =>
+	invoke<AppStatus | null>("apply_custom_ir", { deviceGuid, deviceName });
 export const clearProfile = (deviceGuid: string) =>
 	invoke<AppStatus>("clear_profile", { deviceGuid });
 export const setMaster = (enabled: boolean) => invoke<AppStatus>("set_master", { enabled });
