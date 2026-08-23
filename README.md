@@ -3,7 +3,7 @@
 AutoEq for your Windows system audio — a Wavelet-style frontend. Pick your headphones, hit
 Apply. No config editing.
 
-![Impulse](docs/screenshot.png)
+<img src="docs/screenshot.png" alt="Impulse" width="520">
 
 ## How it works
 
