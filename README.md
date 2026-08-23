@@ -1,16 +1,13 @@
 # Impulse
 
 AutoEq for your Windows system audio — a Wavelet-style frontend. Pick your headphones, hit
-Apply, and the correction is live on your output device about a second later. No reboots, no
-config editing.
+Apply. No config editing.
 
 ## How it works
 
-Impulse uses [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) as its processing
-backend. Equalizer APO's one bad UX moment — the install + reboot cycle — only happens **once**,
-when it is first installed and enabled on a playback device (the Impulse installer offers to
-set it up). After that, it hot-reloads its config within ~1 second, which is what makes instant
-profile switching possible.
+Impulse requires [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) and drives it
+by writing config files; all audio processing is Equalizer APO's. Installing and enabling it on
+a playback device is a prerequisite (the Impulse installer offers to fetch it).
 
 Impulse manages its own file at `<EqualizerAPO>\config\Impulse\Impulse.txt`, pulled in via a
 single `Include:` line appended to `config.txt`. An existing Equalizer APO / Peace setup is
