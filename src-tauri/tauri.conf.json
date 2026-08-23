@@ -14,7 +14,8 @@
       {
         "title": "Impulse",
         "width": 800,
-        "height": 900
+        "height": 900,
+        "transparent": true
       }
     ],
     "security": {

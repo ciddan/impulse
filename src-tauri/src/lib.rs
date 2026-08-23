@@ -23,6 +23,9 @@ struct TrayHandles {
     toggle: CheckMenuItem<tauri::Wry>,
 }
 
+/// Whether the Mica backdrop rendered (false = frontend paints solid).
+struct BackdropState(bool);
+
 #[derive(Serialize)]
 struct DeviceView {
     #[serde(flatten)]
@@ -41,6 +44,29 @@ struct AppStatus {
     headroom_db: f32,
     compensate_shelf: bool,
     autostart: bool,
+    mica: bool,
+    /// System accent colors as "#RRGGBB": (base, light variant, dark variant).
+    accent: Option<String>,
+    accent_light: Option<String>,
+    accent_dark: Option<String>,
+}
+
+/// Read the Windows accent color and its light/dark variants.
+fn system_accent() -> (Option<String>, Option<String>, Option<String>) {
+    use windows::UI::ViewManagement::{UIColorType, UISettings};
+    let Ok(ui) = UISettings::new() else {
+        return (None, None, None);
+    };
+    let get = |t: UIColorType| {
+        ui.GetColorValue(t)
+            .ok()
+            .map(|c| format!("#{:02X}{:02X}{:02X}", c.R, c.G, c.B))
+    };
+    (
+        get(UIColorType::Accent),
+        get(UIColorType::AccentLight2),
+        get(UIColorType::AccentDark1),
+    )
 }
 
 #[derive(Serialize)]
@@ -186,6 +212,7 @@ fn build_status(app: &AppHandle) -> Result<AppStatus, String> {
         .collect();
 
     let autostart = app.autolaunch().is_enabled().unwrap_or(false);
+    let (accent, accent_light, accent_dark) = system_accent();
 
     Ok(AppStatus {
         eapo: eapo_status,
@@ -195,6 +222,10 @@ fn build_status(app: &AppHandle) -> Result<AppStatus, String> {
         headroom_db: st.headroom_db,
         compensate_shelf: st.compensate_shelf,
         autostart,
+        mica: app.try_state::<BackdropState>().map(|s| s.0).unwrap_or(false),
+        accent,
+        accent_light,
+        accent_dark,
     })
 }
 
@@ -625,6 +656,45 @@ fn setup_eapo_include(app: AppHandle) -> CmdResult<AppStatus> {
     build_status(&app)
 }
 
+/// Whether Mica can actually render: needs Windows 11 (build 22000+) and the
+/// user's "Transparency effects" setting enabled.
+fn mica_available() -> bool {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+
+    let build_ok = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion")
+        .and_then(|k| k.get_value::<String, _>("CurrentBuildNumber"))
+        .ok()
+        .and_then(|b| b.parse::<u32>().ok())
+        .map(|b| b >= 22000)
+        .unwrap_or(false);
+    if !build_ok {
+        return false;
+    }
+    // Missing value means transparency is enabled (the default).
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize")
+        .and_then(|k| k.get_value::<u32, _>("EnableTransparency"))
+        .map(|v| v != 0)
+        .unwrap_or(true)
+}
+
+/// Apply Mica when available; report whether it took effect. The frontend
+/// paints an opaque background when it didn't.
+fn apply_backdrop(app: &AppHandle) -> bool {
+    use tauri::window::{Effect, EffectsBuilder};
+    let Some(window) = app.get_webview_window("main") else {
+        return false;
+    };
+    if !mica_available() {
+        return false;
+    }
+    window
+        .set_effects(EffectsBuilder::new().effect(Effect::Mica).build())
+        .is_ok()
+}
+
 #[tauri::command]
 fn open_configurator() -> CmdResult<()> {
     let status = eapo::detect();
@@ -712,6 +782,9 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .setup(|app| {
+            let mica = apply_backdrop(app.handle());
+            app.manage(BackdropState(mica));
+
             let data_dir = app.path().app_data_dir()?;
             let initial = state::load(&data_dir);
             let master_enabled = initial.master_enabled;

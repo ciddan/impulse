@@ -36,4 +36,5 @@ features = [
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_Devices_FunctionDiscovery",
     "Win32_System_Variant",
+    "UI_ViewManagement",
 ]
