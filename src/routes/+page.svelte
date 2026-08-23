@@ -377,11 +377,10 @@
           {#if selectedDevice.assignment}
             <span class="device-profile-inline">
               <span class="profile-name">{selectedDevice.assignment.name}</span>
-              <span class="dim"
-                >{selectedDevice.assignment.source} · {convolutionActive(selectedDevice)
-                  ? "convolution"
-                  : "graphic EQ"}</span
-              >
+              <span class="dim">{selectedDevice.assignment.source}</span>
+              {#if !convolutionActive(selectedDevice)}
+                <span class="chip bad">EQ bypassed — device not at 44.1/48 kHz</span>
+              {/if}
             </span>
           {:else}
             <span class="dim">no EQ profile</span>
@@ -500,13 +499,15 @@
                 ><i class="swatch shelf"></i>Bass shelf</button
               >
             {/if}
-            <button
-              class="legend-item"
-              class:off={!seriesVisible.main}
-              onclick={() => (seriesVisible.main = !seriesVisible.main)}
-              ><i class="swatch total"></i>{rawSeries.length ? "Corrected" : "Correction"}
-              ({curveData.eq_source === "convolver" ? "measured IR" : "graphic EQ"})</button
-            >
+            {#if curveData.eq.length}
+              <button
+                class="legend-item"
+                class:off={!seriesVisible.main}
+                onclick={() => (seriesVisible.main = !seriesVisible.main)}
+                ><i class="swatch total"></i>{rawSeries.length ? "Corrected" : "Correction"}
+                (measured IR)</button
+              >
+            {/if}
             <span class="legend-spacer"></span>
             {#if curveData.smoothed.length}
               <button
@@ -520,6 +521,12 @@
             <div class="hint">
               Correction measured from the active convolver IR
               ({curveData.ir_preamp_db.toFixed(1)} dB built-in gain, shown level-aligned).
+            </div>
+          {:else if selectedDevice && !convolutionActive(selectedDevice)}
+            <div class="hint">
+              No convolver is active: AutoEq impulse responses exist for 44.1 and 48 kHz, and
+              “{selectedDevice.name}” is mixing at {(selectedDevice.sample_rate / 1000).toFixed(1)} kHz.
+              Set the device to 44.1 or 48 kHz in Windows sound settings to enable EQ.
             </div>
           {/if}
         {/if}

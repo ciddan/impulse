@@ -16,14 +16,13 @@ Impulse manages its own file at `<EqualizerAPO>\config\Impulse\Impulse.txt`, pul
 single `Include:` line appended to `config.txt`. An existing Equalizer APO / Peace setup is
 left untouched.
 
-Per device, Impulse writes a `Device:`-scoped section containing either:
+Per device, Impulse writes a `Device:`-scoped section applying AutoEq's minimum-phase impulse
+response with `Convolution:`, plus an optional post-convolver bass shelf and a pre-gain
+assembled from the headroom setting and automatic shelf compensation.
 
-- `Convolution:` with AutoEq's minimum-phase impulse response, when the device mixes at
-  44.1 kHz or 48 kHz (Equalizer APO requires an exact sample-rate match), or
-- the AutoEq `GraphicEQ:` curve as a sample-rate-independent fallback,
-
-plus an optional post-convolver bass shelf and a pre-gain assembled from the headroom setting
-and automatic shelf compensation.
+Impulse is convolution-only. Equalizer APO requires the impulse response to match the
+device's mix rate exactly, and AutoEq publishes 44.1 and 48 kHz IRs — at any other rate the
+device is left unprocessed and the app tells you why.
 
 Headphone data comes from the AutoEq results database (~6,000 models across oratory1990,
 crinacle, Rtings and more), indexed via `results/INDEX.md` in one request and cached locally
@@ -87,6 +86,7 @@ Stack: Tauri v2 (Rust) + SvelteKit (Svelte 5, static adapter, SPA mode) + TypeSc
 
 ## Roadmap
 
+- Custom convolver WAVs (bring your own impulse response)
 - Standalone convolution engine (virtual audio device + WASAPI) to drop the Equalizer APO
   dependency entirely
 - Correction strength slider (requires generating minimum-phase FIRs locally)

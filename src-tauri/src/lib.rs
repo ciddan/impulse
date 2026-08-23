@@ -110,6 +110,15 @@ fn regenerate(app: &AppHandle) -> Result<(), String> {
             _ => None,
         };
 
+        // Convolution or nothing: without an IR matching the device's mix
+        // rate, the device gets no processing (the UI explains why).
+        let Some(ir_file) = ir_file else {
+            continue;
+        };
+        if !profile_dir.join(ir_file).is_file() {
+            continue;
+        }
+
         let mut lines = Vec::new();
         // Pre-gain: user headroom, plus automatic compensation for the bass
         // shelf's positive gain so the shelf can never introduce clipping.
@@ -120,33 +129,9 @@ fn regenerate(app: &AppHandle) -> Result<(), String> {
         if preamp < 0.0 {
             lines.push(format!("Preamp: {:.1} dB", preamp));
         }
-        let use_ir =
-            profile.has_ir && ir_file.is_some() && profile_dir.join(ir_file.unwrap()).is_file();
-        if use_ir {
-            lines.push(format!(
-                "Convolution: profiles\\{}\\{}",
-                key,
-                ir_file.unwrap()
-            ));
-        } else {
-            // Sample-rate independent fallback (also used while device is offline).
-            match fs::read_to_string(profile_dir.join("graphic.txt")) {
-                Ok(content) => {
-                    if let Some(line) = content
-                        .lines()
-                        .find(|l| l.trim_start().starts_with("GraphicEQ:"))
-                    {
-                        lines.push(line.trim().to_string());
-                    }
-                }
-                Err(_) => continue, // Profile files missing; skip section.
-            }
-        }
-        if lines.is_empty() {
-            continue;
-        }
-        // Bass shelf goes after the convolver / graphic EQ line — EAPO
-        // applies filters in config order.
+        lines.push(format!("Convolution: profiles\\{}\\{}", key, ir_file));
+        // Bass shelf goes after the convolver — EAPO applies filters in
+        // config order.
         if profile.bass_gain_db.abs() >= 0.05 {
             lines.push(format!(
                 "Filter 1: ON LS Fc {:.0} Hz Gain {:.1} dB",
@@ -279,9 +264,7 @@ async fn apply_profile(
         .map_err(err_str)?;
 
     let key = eapo::sanitize_key(&source, &name);
-    let mut to_write: Vec<(String, Vec<u8>)> =
-        vec![("graphic.txt".into(), files.graphic_eq.clone().into_bytes())];
-    to_write.extend(files.irs.iter().cloned());
+    let mut to_write: Vec<(String, Vec<u8>)> = files.irs.iter().cloned().collect();
     to_write.extend(files.extras.iter().cloned());
     eapo::install_profile_files(&config_dir, &key, &to_write).map_err(err_str)?;
     eapo::ensure_include(&config_dir).map_err(err_str)?;
@@ -301,7 +284,9 @@ async fn apply_profile(
                 source,
                 form,
                 name,
-                has_ir: has_ir && !files.irs.is_empty(),
+                // Kept for state-file compatibility; download_profile fails
+                // without IRs, so an assignment always has them.
+                has_ir: has_ir || !files.irs.is_empty(),
                 bass_gain_db,
                 bass_fc,
             },
@@ -344,10 +329,10 @@ fn set_master(app: AppHandle, enabled: bool) -> CmdResult<AppStatus> {
 
 #[derive(Serialize, Default)]
 struct CurveData {
-    /// The realized correction curve. For convolution mode this is measured
-    /// from the actual IR wav; otherwise it is the GraphicEQ point set.
+    /// The realized correction curve, measured from the actual IR wav.
+    /// Empty when no IR matches the device's mix rate (no processing).
     eq: Vec<(f32, f32)>,
-    /// "convolver" when eq was measured from the IR, else "graphiceq".
+    /// "convolver" when eq was measured from the IR, else "none".
     eq_source: String,
     /// The IR's built-in preamp (its peak gain, dB) — the chart's eq curve is
     /// normalized by this so shapes are comparable against target.
@@ -361,26 +346,6 @@ struct CurveData {
     equalized_smoothed: Vec<(f32, f32)>,
     /// The target the correction aims for.
     target: Vec<(f32, f32)>,
-}
-
-fn parse_graphic_eq(content: &str) -> Vec<(f32, f32)> {
-    let Some(line) = content
-        .lines()
-        .find(|l| l.trim_start().starts_with("GraphicEQ:"))
-    else {
-        return Vec::new();
-    };
-    let data = line.trim_start().trim_start_matches("GraphicEQ:").trim();
-    let mut points = Vec::new();
-    for pair in data.split(';') {
-        let mut it = pair.split_whitespace();
-        if let (Some(f), Some(g)) = (it.next(), it.next()) {
-            if let (Ok(f), Ok(g)) = (f.parse::<f32>(), g.parse::<f32>()) {
-                points.push((f, g));
-            }
-        }
-    }
-    points
 }
 
 /// Parse AutoEq's per-profile CSV by header name (columns vary by vintage).
@@ -536,12 +501,11 @@ async fn get_curve(app: AppHandle, device_guid: String) -> CmdResult<CurveData> 
         .map(|c| parse_curves_csv(&c))
         .unwrap_or_default();
 
-    // Realized correction: measure the actual convolver IR when convolution
-    // is active for this device; otherwise show the GraphicEQ point set that
-    // EAPO interpolates. The CSV's idealized equalization column is only used
-    // to level-align the measured IR curve, never displayed itself.
+    // Realized correction: measured from the actual convolver IR. The CSV's
+    // idealized equalization column is only used to level-align the measured
+    // curve, never displayed itself.
     let csv_eq = std::mem::take(&mut data.eq);
-    data.eq_source = "graphiceq".into();
+    data.eq_source = "none".into();
     let rate = devices::list_render_devices()
         .ok()
         .and_then(|ds| {
@@ -583,17 +547,14 @@ async fn get_curve(app: AppHandle, device_guid: String) -> CmdResult<CurveData> 
                     data.ir_preamp_db = offset;
                     data.eq_source = "convolver".into();
                 }
-                Err(e) => eprintln!("IR analysis failed, falling back to GraphicEQ: {}", e),
+                Err(e) => eprintln!("IR analysis failed: {}", e),
             }
         }
     }
-    if data.eq.is_empty() {
-        let content = fs::read_to_string(profile_dir.join("graphic.txt")).map_err(err_str)?;
-        data.eq = parse_graphic_eq(&content);
-        data.eq_source = "graphiceq".into();
-    }
-    if data.eq.is_empty() {
-        return Err("No correction curve data found for this profile".into());
+    // eq may legitimately be empty (no IR at this device's mix rate); the
+    // chart still shows the measurement curves from the CSV.
+    if data.eq.is_empty() && data.raw.is_empty() {
+        return Err("No curve data found for this profile".into());
     }
     Ok(data)
 }
@@ -740,14 +701,12 @@ async fn self_heal(app: AppHandle) {
     for profile in assignments {
         let key = eapo::sanitize_key(&profile.source, &profile.name);
         let dir = eapo::profiles_dir(&config_dir).join(&key);
-        if dir.join("graphic.txt").is_file() {
+        if dir.join("minphase_44100.wav").is_file() || dir.join("minphase_48000.wav").is_file() {
             continue;
         }
         match autoeq::download_profile(&profile.source, &profile.form, &profile.name).await {
             Ok(files) => {
-                let mut to_write: Vec<(String, Vec<u8>)> =
-                    vec![("graphic.txt".into(), files.graphic_eq.into_bytes())];
-                to_write.extend(files.irs);
+                let mut to_write: Vec<(String, Vec<u8>)> = files.irs;
                 to_write.extend(files.extras);
                 if let Err(e) = eapo::install_profile_files(&config_dir, &key, &to_write) {
                     eprintln!("self-heal: reinstall of {} failed: {}", key, e);

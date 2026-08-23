@@ -283,15 +283,13 @@ pub async fn download_curves_csv(source: &str, form: &str, name: &str) -> Result
 }
 
 pub struct ProfileFiles {
-    /// Raw contents of "<name> GraphicEQ.txt" (single "GraphicEQ: ..." line).
-    pub graphic_eq: String,
     /// (file name we store as, bytes) for each impulse response found.
     pub irs: Vec<(String, Vec<u8>)>,
     /// Non-IR extras to store alongside (e.g. curves.csv).
     pub extras: Vec<(String, Vec<u8>)>,
 }
 
-/// Download GraphicEQ + minimum-phase IRs for one headphone profile.
+/// Download the minimum-phase IRs (and curves CSV) for one headphone profile.
 pub async fn download_profile(source: &str, form: &str, name: &str) -> Result<ProfileFiles> {
     let client = client()?;
     let base = format!(
@@ -300,21 +298,6 @@ pub async fn download_profile(source: &str, form: &str, name: &str) -> Result<Pr
         BRANCH,
         encode_path_segment(&format!("{}/{}/{}", source, form, name))
     );
-
-    let geq_url = format!(
-        "{}/{}",
-        base,
-        encode_path_segment(&format!("{} GraphicEQ.txt", name))
-    );
-    let resp = client
-        .get(&geq_url)
-        .send()
-        .await
-        .context("download GraphicEQ")?;
-    if !resp.status().is_success() {
-        bail!("GraphicEQ download failed: {} ({})", resp.status(), geq_url);
-    }
-    let graphic_eq = resp.text().await.context("read GraphicEQ body")?;
 
     // Measurement CSV (raw/target/equalization curves) — optional, used by
     // the response chart. Ignore failures.
@@ -342,9 +325,8 @@ pub async fn download_profile(source: &str, form: &str, name: &str) -> Result<Pr
         }
     }
 
-    Ok(ProfileFiles {
-        graphic_eq,
-        irs,
-        extras,
-    })
+    if irs.is_empty() {
+        bail!("This profile publishes no convolution impulse responses");
+    }
+    Ok(ProfileFiles { irs, extras })
 }
