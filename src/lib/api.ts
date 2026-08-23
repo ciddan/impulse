@@ -40,6 +40,10 @@ export interface AppStatus {
   headroom_db: number;
   compensate_shelf: boolean;
   autostart: boolean;
+  mica: boolean;
+  accent: string | null;
+  accent_light: string | null;
+  accent_dark: string | null;
 }
 
 export interface HeadphoneEntry {

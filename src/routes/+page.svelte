@@ -38,6 +38,7 @@
   let selectedGuid = $state<string | null>(null);
   let query = $state("");
   let expandedResult = $state<string | null>(null);
+  let deviceOpen = $state(false);
 
   const results = $derived(searchGroups(groups, query));
   const selectedDevice = $derived(
@@ -231,6 +232,21 @@
   }
 
   let seriesVisible = $state({ raw: true, target: true, shelf: true, main: true });
+
+  // Solid background when the Mica backdrop isn't rendering (old Windows or
+  // transparency effects disabled).
+  $effect(() => {
+    if (status) document.body.classList.toggle("solid", !status.mica);
+  });
+
+  // Adopt the Windows accent color (base for fills, light/dark variants for
+  // link-style text per theme).
+  $effect(() => {
+    if (!status?.accent) return;
+    const root = document.documentElement.style;
+    if (status.accent_light) root.setProperty("--sys-accent-light", status.accent_light);
+    if (status.accent_dark) root.setProperty("--sys-accent-dark", status.accent_dark);
+  });
   let smoothedView = $state(true);
   const rawSeries = $derived.by(() => {
     if (!curveData) return [] as [number, number][];
@@ -245,26 +261,14 @@
   }
 </script>
 
-<main>
-  <header>
-    <div class="title">
-      <h1>Impulse</h1>
-      <span class="subtitle">AutoEq for your system audio</span>
-    </div>
-    {#if status}
-      <button
-        class="master-toggle"
-        class:on={status.master_enabled}
-        onclick={onToggleMaster}
-        disabled={busy || !status.eapo.installed}
-        title="Enable or disable all EQ"
-      >
-        <span class="knob"></span>
-        <span class="label">{status.master_enabled ? "EQ on" : "EQ off"}</span>
-      </button>
-    {/if}
-  </header>
+<svelte:window
+  onclick={() => (deviceOpen = false)}
+  onkeydown={(e) => {
+    if (e.key === "Escape") deviceOpen = false;
+  }}
+/>
 
+<main>
   {#if pendingUpdate}
     <div class="banner update">
       <strong>Update available:</strong> Impulse {pendingUpdate.version}
@@ -299,16 +303,66 @@
 
   {#if status}
     <section class="card">
+      <div class="switch-row">
+        <span class="row-title">Equalization</span>
+        <span class="switch-spacer"></span>
+        <span class="dim">{status.master_enabled ? "On" : "Off"}</span>
+        <button
+          class="switch"
+          class:on={status.master_enabled}
+          role="switch"
+          aria-checked={status.master_enabled}
+          aria-label="Enable equalization"
+          disabled={busy || !status.eapo.installed}
+          onclick={onToggleMaster}
+        >
+          <span class="switch-knob"></span>
+        </button>
+      </div>
+
+      <div class="divider"></div>
+
       <h2>Output device</h2>
-      <select
-        class="device-select"
-        value={selectedDevice?.guid}
-        onchange={(e) => (selectedGuid = (e.target as HTMLSelectElement).value)}
-      >
-        {#each status.devices as d (d.guid)}
-          <option value={d.guid}>{d.name}{d.is_default ? "  (default)" : ""}</option>
-        {/each}
-      </select>
+      <div class="dropdown">
+        <button
+          class="device-select"
+          aria-haspopup="listbox"
+          aria-expanded={deviceOpen}
+          onclick={(e) => {
+            e.stopPropagation();
+            deviceOpen = !deviceOpen;
+          }}
+        >
+          <span>{selectedDevice?.name}{selectedDevice?.is_default ? " (default)" : ""}</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M2 4.2 6 8.2 10 4.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        {#if deviceOpen}
+          {@const selIdx = Math.max(
+            0,
+            status.devices.findIndex((d) => d.guid === selectedDevice?.guid),
+          )}
+          <!-- WinUI combobox behavior: flyout overlays the field with the
+               selected item aligned over it. -->
+          <div class="dd-flyout" role="listbox" style="top: {-(4 + selIdx * 38)}px">
+            {#each status.devices as d (d.guid)}
+              <button
+                class="dd-item"
+                class:selected={selectedDevice?.guid === d.guid}
+                role="option"
+                aria-selected={selectedDevice?.guid === d.guid}
+                onclick={() => {
+                  selectedGuid = d.guid;
+                  deviceOpen = false;
+                }}
+              >
+                {d.name}{d.is_default ? " (default)" : ""}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
       {#if selectedDevice}
         <div class="device-meta">
           {#if selectedDevice.is_default}<span class="chip">default</span>{/if}
@@ -343,9 +397,9 @@
           </button>
         </div>
       {/if}
-    </section>
 
-    <section class="card">
+      <div class="divider"></div>
+
       <h2>
         Headphone profile
         {#if selectedDevice}<span class="for-device">for {selectedDevice.name}</span>{/if}
@@ -401,8 +455,8 @@
       {/if}
     </section>
 
-    {#if selectedDevice?.assignment}
-      <section class="card">
+    <section class="card">
+      {#if selectedDevice?.assignment}
         <div class="response-head">
           <h2>
             Response
@@ -470,13 +524,17 @@
           {/if}
         {/if}
         <div class="switch-row">
+          <span
+            class="row-title"
+            title="Automatically lowers the pre-gain by the bass boost amount so boosted bass can't clip. Off = you manage headroom yourself."
+          >
+            Prevent distortion from bass boost
+          </span>
           {#if status.compensate_shelf && bassShown.gain > 0}
             <span class="dim">(volume: {(headroomShown - bassShown.gain).toFixed(1)} dB)</span>
           {/if}
           <span class="switch-spacer"></span>
-          <span title="Automatically lowers the pre-gain by the bass boost amount so boosted bass can't clip. Off = you manage headroom yourself.">
-            Prevent distortion from bass boost
-          </span>
+          <span class="dim">{status.compensate_shelf ? "On" : "Off"}</span>
           <button
             class="switch"
             class:on={status.compensate_shelf}
@@ -497,27 +555,29 @@
         <div class="sliders">
           <div class="slider-row">
             <span class="slider-label">Bass gain</span>
+            <span class="slider-value">{bassShown.gain > 0 ? "+" : ""}{bassShown.gain.toFixed(1)} dB</span>
             <input
               type="range"
               min="-12"
               max="12"
               step="0.5"
               value={bassShown.gain}
+              style="--fill:{(((bassShown.gain + 12) / 24) * 100).toFixed(1)}%"
               oninput={(e) => onBassInput("gain", e)}
             />
-            <span class="slider-value">{bassShown.gain > 0 ? "+" : ""}{bassShown.gain.toFixed(1)} dB</span>
           </div>
           <div class="slider-row">
             <span class="slider-label">Corner</span>
+            <span class="slider-value">{bassShown.fc.toFixed(0)} Hz</span>
             <input
               type="range"
               min="50"
               max="350"
               step="5"
               value={bassShown.fc}
+              style="--fill:{(((bassShown.fc - 50) / 300) * 100).toFixed(1)}%"
               oninput={(e) => onBassInput("fc", e)}
             />
-            <span class="slider-value">{bassShown.fc.toFixed(0)} Hz</span>
           </div>
         </div>
         {#if bassShown.gain > 0 && !status.compensate_shelf}
@@ -526,22 +586,23 @@
             distort on loud music. Lower the headroom slider to make room for it.
           </div>
         {/if}
-      </section>
-    {/if}
+        <div class="divider"></div>
+      {/if}
 
-    <section class="card">
       <h2>Headroom</h2>
       <div class="slider-row">
+        <span class="slider-label"></span>
+        <span class="slider-value">{headroomShown.toFixed(1)} dB</span>
         <input
           type="range"
           min="-12"
           max="0"
           step="0.5"
           value={headroomShown}
+          style="--fill:{(((headroomShown + 12) / 12) * 100).toFixed(1)}%"
           oninput={onHeadroomInput}
           disabled={!status.eapo.installed}
         />
-        <span class="slider-value">{headroomShown.toFixed(1)} dB</span>
       </div>
       <div class="hint">
         Extra margin for hot masters and intersample peaks. −3 dB is a comfortable default.
@@ -602,88 +663,140 @@
 <style>
   :global(:root) {
     color-scheme: light dark;
-    --accent: #2f6fed;
+    /* WinUI accent-fill mapping: light theme uses AccentDark1 */
+    --accent: var(--sys-accent-dark, #2f6fed);
+    /* Light on Mica: cards are barely-there overlays, Win11 Settings style */
     --bg: #f2f3f7;
     --text: #1c1f27;
-    --card: #ffffff;
-    --border: #dfe2ea;
+    --card: rgba(255, 255, 255, 0.5);
+    --border: rgba(28, 31, 39, 0.07);
     --dim: #5d6373;
     --faint: #868c9a;
-    --surface: #f5f6fa;
-    --surface-hover: #ecedf3;
-    --elev: #f7f8fb;
-    --muted-border: #d3d7e0;
-    --knob-off: #b9bfcc;
+    --surface: rgba(255, 255, 255, 0.55);
+    --surface-hover: rgba(28, 31, 39, 0.05);
+    --elev: rgba(255, 255, 255, 0.45);
+    --muted-border: rgba(28, 31, 39, 0.14);
+    --toggle-border: rgba(28, 31, 39, 0.45);
+    --knob-off: #5d6373;
     --knob: #ffffff;
-    --link: #2456c4;
-    --profile: #2456c4;
-    --chip-bg: #e8eaf1;
+    --track: rgba(28, 31, 39, 0.25);
+    --thumb-ring: #ffffff;
+    --btn-bg: rgba(255, 255, 255, 0.6);
+    --btn-border: rgba(28, 31, 39, 0.14);
+    --link: var(--sys-accent-dark, #2456c4);
+    --profile: var(--sys-accent-dark, #2456c4);
+    --chip-bg: rgba(28, 31, 39, 0.07);
     --chip-text: #4d5364;
     --ok-bg: #d8f1e1;
     --ok-text: #157347;
     --bad-bg: #f8dfe2;
     --bad-text: #b23a4b;
-    --warn-bg: #fdf5da;
+    --warn-bg: rgba(253, 245, 218, 0.8);
     --warn-border: #d9c26a;
-    --err-bg: #fae3e5;
+    --err-bg: rgba(250, 227, 229, 0.85);
     --err-border: #d98a92;
-    --upd-bg: #e5edfd;
-    --danger-border: #e3b6bc;
+    --upd-bg: rgba(229, 237, 253, 0.85);
+    --danger-border: rgba(178, 58, 75, 0.35);
     --danger-text: #b23a4b;
-    --curve-grid: rgba(90, 98, 118, 0.18);
-    --curve-zero: #b7bcc8;
+    --curve-grid: rgba(28, 31, 39, 0.08);
+    --curve-zero: rgba(28, 31, 39, 0.25);
     --curve-tick: #868c9a;
     --curve-raw: #6d7382;
     --curve-target: #58a6e8;
     --curve-shelf: #c97a26;
     --curve-total: #159a5c;
     --curve-corr: #2f6fed;
+    --flyout-bg: #f9f9f9;
+    --flyout-border: rgba(0, 0, 0, 0.09);
+    --flyout-hover: rgba(0, 0, 0, 0.06);
   }
   @media (prefers-color-scheme: dark) {
     :global(:root) {
+      /* WinUI accent-fill mapping: dark theme uses AccentLight2 */
+      --accent: var(--sys-accent-light, #4c8dff);
       --bg: #0d0f13;
       --text: #e6e8ee;
-      --card: #14171e;
-      --border: #222735;
-      --dim: #8b90a0;
-      --faint: #6d7382;
-      --surface: #0f1218;
-      --surface-hover: #1a1e28;
-      --elev: #171a22;
-      --muted-border: #2a2e3a;
-      --knob-off: #3a3f4e;
-      --knob: #e6e8ee;
-      --link: #6ea2ff;
-      --profile: #9fc1ff;
-      --chip-bg: #232734;
+      --card: rgba(255, 255, 255, 0.045);
+      --border: rgba(255, 255, 255, 0.065);
+      --dim: #9aa0af;
+      --faint: #7d8390;
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-hover: rgba(255, 255, 255, 0.07);
+      --elev: rgba(255, 255, 255, 0.035);
+      --muted-border: rgba(255, 255, 255, 0.12);
+      --toggle-border: rgba(230, 232, 238, 0.45);
+      --knob-off: #9aa0af;
+      --knob: #ffffff;
+      --track: rgba(230, 232, 238, 0.25);
+      --thumb-ring: #454b57;
+      --btn-bg: rgba(255, 255, 255, 0.06);
+      --btn-border: rgba(255, 255, 255, 0.09);
+      --link: var(--sys-accent-light, #6ea2ff);
+      --profile: var(--sys-accent-light, #9fc1ff);
+      --chip-bg: rgba(255, 255, 255, 0.08);
       --chip-text: #aab0c0;
-      --ok-bg: #12301c;
+      --ok-bg: rgba(18, 48, 28, 0.85);
       --ok-text: #6fd08c;
-      --bad-bg: #331a1d;
+      --bad-bg: rgba(51, 26, 29, 0.85);
       --bad-text: #e08a91;
-      --warn-bg: #241f11;
+      --warn-bg: rgba(36, 31, 17, 0.75);
       --warn-border: #5d4d1a;
-      --err-bg: #241214;
+      --err-bg: rgba(36, 18, 20, 0.75);
       --err-border: #63272c;
-      --upd-bg: #122036;
-      --danger-border: #3a2a2d;
+      --upd-bg: rgba(18, 32, 54, 0.75);
+      --danger-border: rgba(224, 138, 145, 0.3);
       --danger-text: #e08a91;
-      --curve-grid: rgba(35, 39, 52, 0.4);
-      --curve-zero: #3a3f4e;
-      --curve-tick: #6d7382;
+      --curve-grid: rgba(230, 232, 238, 0.06);
+      --curve-zero: rgba(230, 232, 238, 0.22);
+      --curve-tick: #7d8390;
       --curve-raw: #8b90a0;
       --curve-target: #58a6e8;
       --curve-shelf: #f0a35e;
       --curve-total: #7ee0a3;
       --curve-corr: #6ea2ff;
+      --flyout-bg: #2c2c2c;
+      --flyout-border: rgba(255, 255, 255, 0.08);
+      --flyout-hover: rgba(255, 255, 255, 0.065);
+    }
+  }
+  /* Solid fallback (no Mica): opaque palette. */
+  :global(body.solid) {
+    background: var(--bg);
+    --card: #ffffff;
+    --border: #dfe2ea;
+    --surface: #f5f6fa;
+    --surface-hover: #ecedf3;
+    --elev: #f7f8fb;
+    --btn-bg: #ffffff;
+    --warn-bg: #fdf5da;
+    --err-bg: #fae3e5;
+    --upd-bg: #e5edfd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(body.solid) {
+      --card: #14171e;
+      --border: #222735;
+      --surface: #0f1218;
+      --surface-hover: #1a1e28;
+      --elev: #171a22;
+      --btn-bg: #1a1e28;
+      --warn-bg: #241f11;
+      --err-bg: #241214;
+      --upd-bg: #122036;
     }
   }
   :global(body) {
     margin: 0;
-    background: var(--bg);
+    /* Transparent so the Mica backdrop shows through. */
+    background: transparent;
     color: var(--text);
     font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
     font-size: 14px;
+    user-select: none;
+  }
+  :global(input),
+  :global(textarea) {
+    user-select: text;
   }
   main {
     max-width: 680px;
@@ -691,43 +804,27 @@
     padding: 22px 24px 30px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 2px 6px;
-  }
-  h1 {
-    font-size: 21px;
-    margin: 0;
-    letter-spacing: 0.2px;
-  }
-  .subtitle {
-    color: var(--dim);
-    font-size: 12px;
-  }
-  .title {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    gap: 10px;
   }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 16px 18px;
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
   h2 {
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.9px;
-    color: var(--dim);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text);
     margin: 0;
+  }
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 6px -18px;
   }
   .for-device {
     text-transform: none;
@@ -740,41 +837,13 @@
     font-size: 12px;
   }
 
-  .master-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--surface);
-    border: 1px solid var(--muted-border);
-    border-radius: 999px;
-    padding: 6px 14px 6px 6px;
-    color: var(--dim);
-    cursor: pointer;
-    transition: all 0.15s ease;
+  .row-title {
     font-size: 14px;
-  }
-  .master-toggle .knob {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--knob-off);
-    transition: background 0.15s ease;
-  }
-  .master-toggle.on {
-    border-color: var(--accent);
     color: var(--text);
-    box-shadow: 0 0 14px rgba(47, 111, 237, 0.2);
-  }
-  .master-toggle.on .knob {
-    background: var(--accent);
-  }
-  .master-toggle:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
 
   .banner {
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 12px 14px;
     line-height: 1.45;
   }
@@ -788,7 +857,7 @@
   }
   .banner.update {
     background: var(--upd-bg);
-    border: 1px solid rgba(47, 111, 237, 0.4);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -804,27 +873,92 @@
   .banner button {
     background: var(--accent);
     color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 7px 14px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom-color: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 6px 14px;
     cursor: pointer;
+    font-family: inherit;
+  }
+  .banner button:hover {
+    filter: brightness(1.08);
   }
 
+  .dropdown {
+    position: relative;
+  }
   .device-select {
     width: 100%;
     box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    border: 1px solid var(--muted-border);
+    border-radius: 4px;
     color: inherit;
+    font-family: inherit;
     font-size: 14px;
     font-weight: 600;
-    padding: 10px 12px;
+    padding: 9px 12px;
     outline: none;
     cursor: pointer;
   }
-  .device-select:focus {
+  .device-select:focus-visible {
     border-color: var(--accent);
+  }
+  .device-select svg {
+    color: var(--dim);
+    flex-shrink: 0;
+  }
+  .dd-flyout {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: var(--flyout-bg);
+    border: 1px solid var(--flyout-border);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.36);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .dd-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 36px;
+    box-sizing: border-box;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 0 12px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .dd-item:hover {
+    background: var(--flyout-hover);
+  }
+  .dd-item.selected {
+    background: var(--flyout-hover);
+  }
+  .dd-item.selected::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--accent);
   }
   .device-meta {
     display: flex;
@@ -864,15 +998,18 @@
     width: 100%;
     box-sizing: border-box;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    border: 1px solid var(--muted-border);
+    border-bottom-color: var(--toggle-border);
+    border-radius: 4px;
     color: inherit;
     font-size: 15px;
-    padding: 11px 14px;
+    padding: 10px 14px;
     outline: none;
+    font-family: inherit;
   }
   input[type="search"]:focus {
-    border-color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 9px;
   }
 
   .results {
@@ -891,7 +1028,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 7px 10px;
-    border-radius: 8px;
+    border-radius: 4px;
   }
   .result-row:hover {
     background: var(--surface-hover);
@@ -915,18 +1052,24 @@
   .apply {
     background: var(--accent);
     color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 6px 16px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom-color: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 5px 16px;
     cursor: pointer;
     flex-shrink: 0;
+    font-family: inherit;
+  }
+  .apply:hover {
+    filter: brightness(1.08);
   }
   .apply:disabled {
     opacity: 0.5;
     cursor: default;
+    filter: none;
   }
   .apply.small {
-    padding: 3px 12px;
+    padding: 2px 12px;
     font-size: 12px;
   }
   .variants {
@@ -969,9 +1112,10 @@
     border: none;
     color: inherit;
     font-size: inherit;
+    font-family: inherit;
     padding: 2px 4px;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 4px;
     transition: opacity 0.12s ease;
   }
   .legend-item:hover {
@@ -981,7 +1125,7 @@
     opacity: 0.38;
   }
   .legend-item.off .swatch {
-    background: var(--knob-off) !important;
+    background: var(--track) !important;
   }
   .swatch {
     display: inline-block;
@@ -1008,28 +1152,61 @@
     flex-direction: column;
     gap: 8px;
   }
+  /* Windows Settings slider row: label left, value then a right-anchored slider */
   .slider-row {
     display: flex;
     align-items: center;
     gap: 14px;
-  }
-  .slider-row input[type="range"] {
-    flex: 1;
-    accent-color: var(--accent);
+    min-height: 30px;
   }
   .slider-label {
-    color: var(--dim);
-    font-size: 12px;
-    min-width: 62px;
+    flex: 1;
+    color: var(--text);
+    font-size: 14px;
   }
   .slider-value {
     font-variant-numeric: tabular-nums;
-    min-width: 62px;
+    min-width: 52px;
     text-align: right;
-    color: var(--profile);
-    font-weight: 600;
+    color: var(--text);
   }
 
+  /* Fluent slider: filled track + ringed thumb */
+  .slider-row input[type="range"] {
+    flex: 0 0 52%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 20px;
+    background: transparent;
+    margin: 0;
+  }
+  .slider-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 3px;
+    border-radius: 1.5px;
+    background: linear-gradient(
+      to right,
+      var(--accent) 0 var(--fill, 50%),
+      var(--track) var(--fill, 50%) 100%
+    );
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -7.5px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 5px solid var(--thumb-ring);
+    box-shadow: 0 0 0 1px var(--border);
+    box-sizing: border-box;
+    cursor: pointer;
+  }
+  .slider-row input[type="range"]:disabled {
+    opacity: 0.5;
+  }
+
+  /* Fluent toggle switch */
   .switch-row {
     display: flex;
     align-items: center;
@@ -1042,31 +1219,35 @@
   }
   .switch {
     position: relative;
-    width: 38px;
+    display: inline-block;
+    width: 40px;
     height: 20px;
     flex-shrink: 0;
-    border-radius: 999px;
-    border: none;
-    background: var(--knob-off);
+    border-radius: 10px;
+    border: 1px solid var(--toggle-border);
+    background: transparent;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
     padding: 0;
+    box-sizing: border-box;
   }
   .switch.on {
     background: var(--accent);
+    border-color: var(--accent);
   }
   .switch-knob {
     position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
+    top: 3px;
+    left: 3px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    background: var(--knob);
-    transition: transform 0.15s ease;
+    background: var(--knob-off);
+    transition: transform 0.15s ease, background 0.15s ease;
   }
   .switch.on .switch-knob {
-    transform: translateX(18px);
+    background: var(--knob);
+    transform: translateX(20px);
   }
 
   .assigned {
@@ -1083,20 +1264,24 @@
     align-items: center;
     background: var(--elev);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 4px;
     padding: 8px 14px;
   }
   .assigned li.offline {
     opacity: 0.65;
   }
   .remove {
-    background: transparent;
-    border: 1px solid var(--danger-border);
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
     color: var(--danger-text);
-    border-radius: 8px;
+    border-radius: 4px;
     padding: 5px 12px;
     cursor: pointer;
     flex-shrink: 0;
+    font-family: inherit;
+  }
+  .remove:hover {
+    background: var(--surface-hover);
   }
 
   .hint {
@@ -1111,6 +1296,7 @@
     cursor: pointer;
     padding: 0;
     font-size: inherit;
+    font-family: inherit;
   }
   .link:disabled {
     opacity: 0.5;
@@ -1129,6 +1315,9 @@
     align-items: center;
     gap: 8px;
     cursor: pointer;
+  }
+  .autostart input {
+    accent-color: var(--accent);
   }
   .footer-right {
     display: flex;
